@@ -73,7 +73,7 @@ class KindredLabsBot(BaseBot):
 
             task_id=task.get('uid')
             self.complete_task(task_id)
-            time.sleep(3)
+            time.sleep(random.randint(0,2))
     # 领取奖励
     def claim_all_rewords(self):
         tasks=self.tasks()
@@ -82,7 +82,7 @@ class KindredLabsBot(BaseBot):
                 continue
             task_id=task.get('uid')
             self.claim_rewards(task_id) 
-            time.sleep(3)
+            time.sleep(random.randint(0,2))
     def claim_rewards(self,task_id:str):
         self.session.headers.update({
             'next-action': Action.CLAIM_REWARD,
@@ -191,20 +191,17 @@ class KindredLabsBotManager(BaseBotManager):
             bot.complete_all_task()
         except Exception as e:
             logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},complete_tasks失败,原因:{e}")
-        time.sleep(60)
-        try:
-            bot.claim_all_rewords()
-        except Exception as e:
-            logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},claim_tasks失败,原因:{e}")
-       
+        return bot
     def run(self):
         with ThreadPoolExecutor(max_workers=self.config.max_worker) as executor:
             futures = [executor.submit(self.run_single, account) for account in self.accounts]
+            bot_list=[]
             for future in as_completed(futures):
                 try:
-                    future.result()
+                    bot=future.result()
+                    bot_list.append(bot)
                 except Exception as e:
                     logger.error(f"执行过程中发生错误: {e}")
-
-
+            
+            futures = [executor.submit(bot.claim_all_rewords()) for bot in bot_list]
     
