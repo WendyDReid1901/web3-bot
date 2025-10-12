@@ -42,6 +42,66 @@ import requests
 from loguru import logger
 from eth_account.messages import encode_defunct
 from datetime import datetime
+from tenacity import (
+    retry,
+    stop_after_attempt,  # 重试次数限制
+    wait_exponential,    # 指数退避等待
+    retry_if_exception_type,  # 基于异常重试
+    retry_if_result,     # 基于响应结果重试
+    after_log,           # 重试后日志输出
+)
+def create_retry_session(
+    session: Optional[Session] = None,
+    max_retries: int = 3,  # 最大重试次数
+    initial_wait: float = 1.0,  # 初始重试间隔（秒）
+    max_wait: float = 10.0  # 最大重试间隔（秒） 
+) -> Session:
+    """
+    创建带重试拦截器的 curl_cffi Session
+
+    参数:
+        max_retries: 最大重试次数（默认 3 次）
+        initial_wait: 第一次重试前等待时间（默认 1 秒）
+        max_wait: 最大重试等待时间（默认 10 秒，避免间隔过长）
+
+    返回:
+        带重试逻辑的 Session 实例
+    """
+
+    # --------------------------
+    # 1. 定义重试条件
+    # --------------------------
+    retry_on_exceptions = retry_if_exception_type(
+        (ConnectionError, TimeoutError)  # 元组：包含所有需要重试的异常类型
+    )
+
+    def should_retry_response(response) -> bool:
+        """5xx 服务器错误 / 429 限流，触发重试"""
+        if response is None:
+            return False
+        return response.status_code in (429,403,407, 500, 502, 503, 504,400)
+    retry_on_response = retry_if_result(should_retry_response)
+    # --------------------------
+    # 2. 定义重试装饰器
+    # --------------------------
+    retry_decorator = retry(
+        stop=stop_after_attempt(max_retries),  # 最大重试次数
+        wait=wait_exponential(multiplier=1, min=initial_wait, max=max_wait),  # 指数退避
+        retry=(retry_on_exceptions | retry_on_response),  # 异常 或 响应错误，都重试
+        after=after_log(logger,'DEBUG'),  # 重试后打印日志
+        reraise=True,  # 所有重试失败后，重新抛出最终异常
+    )
+    # --------------------------
+    # 3. 为 Session 的请求方法添加重试装饰器
+    # --------------------------
+    # 覆盖 Session 的 get/post/put/delete 等常用方法
+    session.get = retry_decorator(session.get)
+    session.post = retry_decorator(session.post)
+    session.put = retry_decorator(session.put)
+    session.delete = retry_decorator(session.delete)
+
+    return session
+
 def deploy_check_in_contract():
     """
     部署一个签到合约到以太坊网络

@@ -1,6 +1,6 @@
 from core.utils import *
 from core.config import Config
-
+from curl_cffi.requests import Session
 class BaseBot():
     headers={
         'Accept': 'application/json, text/plain, */*',
@@ -16,7 +16,6 @@ class BaseBot():
         self.web3 = web3
         self.RETRY_INTERVAL=config.RETRY_INTERVAL
         self.chain_id = config.chain_id
-        self.ua= UserAgent()
         self.session=Session(
             proxies=self.proxies,
             headers=self.headers,
@@ -24,9 +23,9 @@ class BaseBot():
             verify=False,
             timeout=600
         )
-        self.session.headers.update({'User-Agent': self.ua.chrome})
         self.account=account
         self.config:Config=config
+        self.session=create_retry_session(self.session,self.config.config.get('RETRY_COUNT',3),self.config.config.get('RETRY_INTERVAL',1))
         self.wallet:LocalAccount=self.web3.eth.account.from_key(self.account.get("private_key"))
         if self.account.get('address')!=self.wallet.address or not self.account.get('address'):
             self.account['address']=self.wallet.address
@@ -35,15 +34,13 @@ class BaseBot():
             self.index=self.config.accounts.index(account)
         except:
             self.index=0
-    def get_new_session(self,headers):
+    def get_new_session(self):
         session=Session(
             proxies=self.proxies,
-            # headers=self.headers,
             impersonate="safari17_2_ios",
             verify=False,
             timeout=600
         )
-        # session.headers.update({'User-Agent': self.ua.chrome})
         return session
     def _handle_response(self, response: requests.Response, retry_func=None) -> None:
         """处理响应状态"""
@@ -66,7 +63,7 @@ class BaseBotManager():
     def __init__(self,config_path:str):
         self.config=Config(config_path)
         self.accounts=self.config.accounts
-        if self.config.proxy:
+        if self.config.config.get('rpc_proxy'):
             self.proxies = {
                 "http": self.config.proxy,
                 "https": self.config.proxy,

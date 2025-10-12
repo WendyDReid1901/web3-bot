@@ -88,6 +88,40 @@ class TakerBot(BaseBot):
         })
         self.get_user_info()
         logger.success(f"登录成功,第{self.index}个账户:{self.wallet.address}")
+    def get_token(self):
+        # https://sowing-api.taker.xyz/ido_info
+        params = {
+            'walletAddress': self.wallet.address,
+        }
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Origin': 'https://airdrop.taker.xyz',
+            'Pragma': 'no-cache',
+            'Referer': 'https://airdrop.taker.xyz/',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-site',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0',
+            'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+        }
+        self.session.headers.update(headers)
+        response=self.session.get('https://sowing-api.taker.xyz/ido_info',params=params)
+        # data=self._handle_response(response)
+        tokenAmount=0
+        if 'tokenAmount' in response.text:
+            tokenAmount=response.json().get('result',{}).get('tokenAmount',0)
+
+        self.account['tokenAmount']=tokenAmount
+        self.config.save_accounts()
+        logger.info(f"第{self.index}个账户:{self.wallet.address},tokenAmount:{tokenAmount}")
+
+
+
     def connect_x(self,url="https://twitter.com/i/oauth2/authorize?response_type=code&client_id=d1E1aFNaS0xVc2swaVhFaVltQlY6MTpjaQ&redirect_uri=https%3A%2F%2Fearn.taker.xyz%2Fbind%2Fx&scope=tweet.read+users.read+follows.read&state=state&code_challenge=challenge&code_challenge_method=plain"):
         assert self.account.get('registed'),"账户未注册"
         if self.account.get('bind_x'):
@@ -253,15 +287,16 @@ class TakerBotManager(BaseBotManager):
     def run_single(self,account):
         bot=TakerBot(account,self.web3,self.config)
         bot.login()
-        try:
-            bot.mining()
-        except Exception as e:
-            logger.error(f"账户:{bot.wallet.address},挖矿失败,{e}")
-        bot.done_tasks()
-        try:
-            bot.get_user_info()
-        except Exception as e:
-            logger.error(f"账户:{bot.wallet.address},获取用户信息失败,{e}")
+        bot.get_token()
+        # try:
+        #     bot.mining()
+        # except Exception as e:
+        #     logger.error(f"账户:{bot.wallet.address},挖矿失败,{e}")
+        # bot.done_tasks()
+        # try:
+        #     bot.get_user_info()
+        # except Exception as e:
+        #     logger.error(f"账户:{bot.wallet.address},获取用户信息失败,{e}")
     def run(self):
         with ThreadPoolExecutor(max_workers=self.config.max_worker) as executor:
             futures = [executor.submit(self.run_single, account) for account in self.accounts]
@@ -293,15 +328,16 @@ class TakerBotManager2(BaseBotManager):
         bot=TakerBot(account,self.web3,self.config)
         invitationCode=random.choice(self.config2.accounts).get('invitationCode')
         bot.login(invitationCode)
-        try:
-            bot.mining()
-        except Exception as e:
-            logger.error(f"账户:{bot.wallet.address},挖矿失败,{e}")
-        bot.done_tasks()
-        try:
-            bot.get_user_info()
-        except Exception as e:
-            logger.error(f"账户:{bot.wallet.address},获取用户信息失败,{e}")
+        bot.get_token()
+        # try:
+        #     bot.mining()
+        # except Exception as e:
+        #     logger.error(f"账户:{bot.wallet.address},挖矿失败,{e}")
+        # bot.done_tasks()
+        # try:
+        #     bot.get_user_info()
+        # except Exception as e:
+        #     logger.error(f"账户:{bot.wallet.address},获取用户信息失败,{e}")
     def run(self):
         with ThreadPoolExecutor(max_workers=self.config.max_worker) as executor:
             futures = [executor.submit(self.run_single, account) for account in self.accounts]

@@ -71,7 +71,7 @@ class OKXSession(requests.Session):
         method = method.upper()
         body = ''
         if method in ['POST', 'PUT']:
-            if 'data' in kwargs:
+            if 'data' in kwargs and kwargs.get('data'):
                 body = kwargs['data']
             elif 'json' in kwargs:
                 import json
@@ -82,11 +82,12 @@ class OKXSession(requests.Session):
         }
         # 生成auth_params
         auth_params = generate_auth_params(
-            url,
+            url.replace('https://web3.okx.com',''),
             fetch_config,
             self.timestamp_for_test,
             self.token_for_test
         )
+        print(auth_params)
         # 更新headers
         headers.update(auth_params)
         # 将更新后的headers放回kwargs
@@ -340,20 +341,20 @@ class OkxDrop:
         return response.text
     
 if __name__=='__main__':
-    drop=OkxDrop('onegravity','xxx')
-    # data=drop.get_winner()
-    # print(data)
+    drop=OkxDrop('onegravity')
+    data=drop.get_winner()
+    print(data)
     # data=drop.get_sign('0x72691a36ed1fac3b197fb42612dc15a8958bf9f2')
     # print(data)
     # data=drop.get_info('0x72691a36ed1fac3b197fb42612dc15a8958bf9f2')
     # print(data)
     # data=drop.get_subscribe_task('0x72691a36ed1fac3b197fb42612dc15a8958bf9f2')
     # print(data)
-    web3=Web3(Web3.HTTPProvider('wallet.okex.org/fullnode/base/discover/rpc'))
-    if web3.is_connected():print(web3.eth.chain_id)
-    address='0xxxx'
-    private_key='0xxxx'
-    print(drop.login(web3,address,private_key))
-    # drop.oauth2Url(address)
-    drop.oauth2Url2(address)
+    # web3=Web3(Web3.HTTPProvider('wallet.okex.org/fullnode/base/discover/rpc'))
+    # if web3.is_connected():print(web3.eth.chain_id)
+    # address='0xxxx'
+    # private_key='0xxxx'
+    # print(drop.login(web3,address,private_key))
+    # # drop.oauth2Url(address)
+    # drop.oauth2Url2(address)
     
