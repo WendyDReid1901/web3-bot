@@ -13,6 +13,8 @@ class Action:
     CLAIM_REWARD='600e3bb087c8f43b884f2319e8972028fdc079d4d6'
     REGISTRY='40386a47c19c6e814260933888a8d35a4e4aa98d04'
     LOGIN='409cfb32c35ecbf802808a34c2a75efaa95619f661'
+    CHECKIN='40e858d0a121a72685e9095161a60c96c0f10dcb66'
+    BAG='4029553632518e59a6215cafd12264701dc3885f4f'
 
 class KindredLabsBot(BaseBot):
     def _handle_response(self, response, retry_func=None) -> None:
@@ -58,7 +60,30 @@ class KindredLabsBot(BaseBot):
         except Exception as e:
             logger.error(f"账户:第{self.index}个地址,{self.wallet.address},task失败,原因:{e}")
             return []
-    
+    def checkin(self):
+        self.session.headers.update({
+            'next-action': Action.CHECKIN,
+        })
+        logger.info(f"账户:第{self.index}个地址,{self.wallet.address},checkin中...")
+        data = '["%s"]'%(self.account.get('idToken'))
+        response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
+        self._handle_response(response)
+        logger.success(f"账户:第{self.index}个地址,{self.wallet.address},complete_task成功")
+        return data
+    def bag(self):
+        self.session.headers.update({
+            'next-action': Action.BAG,
+        })
+        logger.info(f"账户:第{self.index}个地址,{self.wallet.address},bag中...")
+        data = '["%s"]'%(self.account.get('idToken'))
+        response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
+        self._handle_response(response)
+        data=json.loads('{'+response.text.split('1:{')[-1])
+        inventories=json.dumps(data.get('result',{}).get('inventories'))
+        self.account['inventories']=inventories
+        self.config.save_accounts()
+        logger.success(f"账户:第{self.index}个地址,{self.wallet.address},bag成功")
+        return data
     def complete_task(self,task_id:str):
         self.session.headers.update({
             'next-action': Action.COMPLETE_TASK,
@@ -72,7 +97,9 @@ class KindredLabsBot(BaseBot):
     def complete_all_task(self):
         tasks=self.tasks()
         for task in tasks:
-            if not isinstance(task,dict) and not task.get('allowToSubmit'):
+            if not isinstance(task,dict):
+                continue
+            if not task.get('allowToSubmit'):
                 continue
 
             task_id=task.get('uid')
@@ -82,7 +109,9 @@ class KindredLabsBot(BaseBot):
     def claim_all_rewords(self):
         tasks=self.tasks()
         for task in tasks:
-            if not isinstance(task,dict) and not task.get('allowToClaim'):
+            if not isinstance(task,dict):
+                continue
+            if not task.get('allowToClaim'):
                 continue
             task_id=task.get('uid')
             self.claim_rewards(task_id) 
@@ -199,6 +228,25 @@ class KindredLabsBotManager(BaseBotManager):
             bot.complete_all_task()
         except Exception as e:
             logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},complete_tasks失败,原因:{e}")
+        try:
+            bot.checkin()
+        except Exception as e:
+            logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},checkin失败,原因:{e}")
+        try:
+            bot.bag()
+        except Exception as e:
+            logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},bag失败,原因:{e}")
+        return bot
+    def run_single2(self,bot):
+        try:
+            bot.claim_all_rewords()
+        except Exception as e:
+            logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},claim_all_rewords失败,原因:{e}")
+        try:
+            bot.userinfo()
+        except Exception as e:
+            logger.error(f"账户:第{bot.index}个地址,{bot.wallet.address},userinfo失败,原因:{e}")
+       
         return bot
     def run(self):
         with ThreadPoolExecutor(max_workers=self.config.max_worker) as executor:
@@ -211,5 +259,9 @@ class KindredLabsBotManager(BaseBotManager):
                 except Exception as e:
                     logger.error(f"执行过程中发生错误: {e}")
             
-            futures = [executor.submit(bot.claim_all_rewords()) for bot in bot_list]
-    
+            futures = [executor.submit(self.run_single2, bot) for bot in bot_list]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"执行过程中发生错误: {e}")
