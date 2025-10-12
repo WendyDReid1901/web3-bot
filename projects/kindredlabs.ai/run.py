@@ -6,7 +6,7 @@ if __name__ == '__main__':
     config_path='projects/kindredlabs.ai/config.json'
     manager=KindredLabsBotManager(config_path)
     # 每天9点运行
-    # manager.run()
+    manager.run()
     scheduler = BlockingScheduler(
         timezone='Asia/Shanghai',
         job_defaults={
