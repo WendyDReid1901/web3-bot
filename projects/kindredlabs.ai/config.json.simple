@@ -1,5 +1,6 @@
 {
     "rpc_url":"https://rpc.ankr.com/eth/xxx",
+    "rpc_proxy":"",
     "proxy":"http://xxx",
     "site":"https://waitlist.kindredlabs.ai/",
     "chain_id":1,
