@@ -43,17 +43,21 @@ class KindredLabsBot(BaseBot):
         self.config.save_accounts()
         logger.success(f"账户:第{self.index}个地址,{self.wallet.address},dashboard成功")
     def tasks(self)->List[Dict]:
-        self.session.headers.update({
-            'next-action': Action.TASK,
-        })
-        logger.info(f"账户:第{self.index}个地址,{self.wallet.address},task中...")
-        data = '["%s"]'%(self.account.get('idToken'))
-        response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
-        self._handle_response(response)
-        data=json.loads('{'+response.text.split('1:{')[-1]).get('result')
-        logger.success(f"账户:第{self.index}个地址,{self.wallet.address},dashboard成功")
+        try:
+            self.session.headers.update({
+                'next-action': Action.TASK,
+            })
+            logger.info(f"账户:第{self.index}个地址,{self.wallet.address},task中...")
+            data = '["%s"]'%(self.account.get('idToken'))
+            response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
+            self._handle_response(response)
+            data=json.loads('{'+response.text.split('1:{')[-1]).get('result')
+            logger.success(f"账户:第{self.index}个地址,{self.wallet.address},dashboard成功")
 
-        return data
+            return data
+        except Exception as e:
+            logger.error(f"账户:第{self.index}个地址,{self.wallet.address},task失败,原因:{e}")
+            return []
     
     def complete_task(self,task_id:str):
         self.session.headers.update({
@@ -68,7 +72,7 @@ class KindredLabsBot(BaseBot):
     def complete_all_task(self):
         tasks=self.tasks()
         for task in tasks:
-            if not task.get('allowToSubmit'):
+            if not isinstance(task,dict) and not task.get('allowToSubmit'):
                 continue
 
             task_id=task.get('uid')
@@ -78,21 +82,25 @@ class KindredLabsBot(BaseBot):
     def claim_all_rewords(self):
         tasks=self.tasks()
         for task in tasks:
-            if not task.get('allowToClaim'):
+            if not isinstance(task,dict) and not task.get('allowToClaim'):
                 continue
             task_id=task.get('uid')
             self.claim_rewards(task_id) 
             time.sleep(random.randint(0,2))
     def claim_rewards(self,task_id:str):
-        self.session.headers.update({
-            'next-action': Action.CLAIM_REWARD,
-        })
-        logger.info(f"账户:第{self.index}个地址,{self.wallet.address},claim_reward中...")
-        data = '["%s","%s"]'%(self.account.get('idToken'),task_id)
-        response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
-        self._handle_response(response)
-        logger.success(f"账户:第{self.index}个地址,{self.wallet.address},claim_reward成功")
-        return data
+        try:
+            self.session.headers.update({
+                'next-action': Action.CLAIM_REWARD,
+            })
+            logger.info(f"账户:第{self.index}个地址,{self.wallet.address},claim_reward中...")
+            data = '["%s","%s"]'%(self.account.get('idToken'),task_id)
+            response = self.session.post('https://waitlist.kindredlabs.ai/dashboard', data=data)
+            self._handle_response(response)
+            logger.success(f"账户:第{self.index}个地址,{self.wallet.address},claim_reward成功")
+            return data
+        except Exception as e:
+            logger.error(f"账户:第{self.index}个地址,{self.wallet.address},claim_reward失败,原因:{e}")
+            return None
     
     def registe(self):
         if self.account.get('registed'):
